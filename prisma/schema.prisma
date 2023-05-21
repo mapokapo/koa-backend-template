@@ -1,0 +1,52 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Profile {
+  firebaseUid String    @id
+  email       String    @unique
+  name        String
+  imageUrl    String?
+  roles       Role[]
+  posts       Post[]
+  uploads     Upload[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Role {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  profiles  Profile[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Post {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String?
+  author    Profile  @relation(fields: [authorUid], references: [firebaseUid])
+  authorUid String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Upload {
+  id        Int   @id @default(autoincrement())
+  fileName  String
+  mimeType  String
+  owner     Profile  @relation(fields: [ownerUid], references: [firebaseUid])
+  ownerUid  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
