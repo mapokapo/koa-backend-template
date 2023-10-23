@@ -86,6 +86,10 @@ are some exceptions:
 - The `uploads.ts` router contains the `/:id/download` endpoint, which is used
   to download private files.
 
+## Roadmap
+
+- [ ] Add automatically generated OpenAPI documentation
+
 ## Contributing
 
 Contributions are welcome! For major changes, please open an issue first to

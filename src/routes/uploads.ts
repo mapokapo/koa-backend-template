@@ -1,33 +1,30 @@
 import Router from "@koa/router";
-import { z } from "zod";
 import { KoaAppContext, KoaAppState } from "../app.js";
 import authGuard from "../middleware/authGuard.js";
-import { Profile } from "@prisma/client";
 import fileUploadMiddleware from "../middleware/fileUploadMiddleware.js";
 import send from "koa-send";
 import * as path from "path";
+import uploadsService from "../services/uploadsService.js";
+import idPathParamSchema from "../schemas/pathParams/id.js";
 
 const uploadsRouter = new Router<KoaAppState, KoaAppContext>({
 	prefix: "/uploads",
 });
 
-uploadsRouter.get("/", authGuard({ requiresProfile: true }), async ctx => {
-	const user = ctx.state.user as Profile;
-	const uploads = await ctx.prisma.upload.findMany({
-		where: {
-			ownerUid: user.firebaseUid,
-		},
-	});
+uploadsRouter.get("/", authGuard(), async ctx => {
+	const user = ctx.state.user;
+
+	const uploads = await uploadsService.getAllUploads(ctx, user.firebaseUid);
+
 	ctx.body = uploads;
 });
-uploadsRouter.get("/:id", authGuard({ requiresProfile: true }), async ctx => {
-	const user = ctx.state.user as Profile;
-	const id = z.coerce.number().parse(ctx.params["id"]);
-	const upload = await ctx.prisma.upload.findUnique({
-		where: {
-			id,
-		},
-	});
+uploadsRouter.get("/:id", authGuard(), async ctx => {
+	const user = ctx.state.user;
+
+	const id = idPathParamSchema.parse(ctx.params["id"]);
+
+	const upload = await uploadsService.getUploadById(ctx, id);
+
 	if (!upload) {
 		ctx.body = {
 			error: "Upload not found",
@@ -35,6 +32,7 @@ uploadsRouter.get("/:id", authGuard({ requiresProfile: true }), async ctx => {
 		ctx.status = 404;
 		return;
 	}
+
 	if (upload.ownerUid !== user.firebaseUid) {
 		ctx.body = {
 			error: "Forbidden",
@@ -42,70 +40,63 @@ uploadsRouter.get("/:id", authGuard({ requiresProfile: true }), async ctx => {
 		ctx.status = 403;
 		return;
 	}
+
 	ctx.body = upload;
 });
-uploadsRouter.get(
-	"/:id/download",
-	authGuard({ requiresProfile: true }),
-	async ctx => {
-		const user = ctx.state.user as Profile;
-		const id = z.coerce.number().parse(ctx.params["id"]);
-		const upload = await ctx.prisma.upload.findUnique({
-			where: {
-				id,
-			},
-		});
-		if (!upload) {
-			ctx.body = {
-				error: "Upload not found",
-			};
-			ctx.status = 404;
-			return;
-		}
-		if (upload.ownerUid !== user.firebaseUid) {
-			ctx.body = {
-				error: "Forbidden",
-			};
-			ctx.status = 403;
-			return;
-		}
-		await send(ctx, path.join("uploads", upload.fileName));
+uploadsRouter.get("/:id/download", authGuard(), async ctx => {
+	const user = ctx.state.user;
+
+	const id = idPathParamSchema.parse(ctx.params["id"]);
+
+	const upload = await uploadsService.getUploadById(ctx, id);
+
+	if (!upload) {
+		ctx.body = {
+			error: "Upload not found",
+		};
+		ctx.status = 404;
+		return;
 	}
-);
+
+	if (upload.ownerUid !== user.firebaseUid) {
+		ctx.body = {
+			error: "Forbidden",
+		};
+		ctx.status = 403;
+		return;
+	}
+
+	await send(ctx, path.join("uploads", upload.fileName));
+});
 uploadsRouter.post(
 	"/",
 	fileUploadMiddleware().single("file"),
-	authGuard({ requiresProfile: true }),
+	authGuard(),
 	async ctx => {
-		const user = ctx.state.user as Profile;
+		const user = ctx.state.user;
 		const file = ctx.request.file;
-		const upload = await ctx.prisma.upload.create({
-			data: {
-				fileName: file.filename,
-				mimeType: file.mimetype,
-				owner: {
-					connect: {
-						firebaseUid: user.firebaseUid,
-					},
-				},
-			},
-		});
+
+		const upload = await uploadsService.createUpload(
+			ctx,
+			user.firebaseUid,
+			file
+		);
+
 		ctx.body = upload;
 	}
 );
 uploadsRouter.put(
 	"/:id",
 	fileUploadMiddleware().single("file"),
-	authGuard({ requiresProfile: true }),
+	authGuard(),
 	async ctx => {
-		const user = ctx.state.user as Profile;
+		const user = ctx.state.user;
 		const file = ctx.request.file;
-		const id = z.coerce.number().parse(ctx.params["id"]);
-		const upload = await ctx.prisma.upload.findUnique({
-			where: {
-				id,
-			},
-		});
+
+		const id = idPathParamSchema.parse(ctx.params["id"]);
+
+		const upload = await uploadsService.getUploadById(ctx, id);
+
 		if (!upload) {
 			ctx.status = 404;
 			ctx.body = {
@@ -113,6 +104,7 @@ uploadsRouter.put(
 			};
 			return;
 		}
+
 		if (upload.ownerUid !== user.firebaseUid) {
 			ctx.status = 403;
 			ctx.body = {
@@ -120,50 +112,38 @@ uploadsRouter.put(
 			};
 			return;
 		}
-		const newUpload = await ctx.prisma.upload.update({
-			where: {
-				id,
-			},
-			data: {
-				fileName: file.filename,
-				mimeType: file.mimetype,
-			},
-		});
+
+		const newUpload = await uploadsService.updateUpload(ctx, id, file);
+
 		ctx.body = newUpload;
 	}
 );
-uploadsRouter.delete(
-	"/:id",
-	authGuard({ requiresProfile: true }),
-	async ctx => {
-		const user = ctx.state.user as Profile;
-		const id = z.coerce.number().parse(ctx.params["id"]);
-		const upload = await ctx.prisma.upload.findUnique({
-			where: {
-				id,
-			},
-		});
-		if (!upload) {
-			ctx.status = 404;
-			ctx.body = {
-				error: "Upload not found",
-			};
-			return;
-		}
-		if (upload.ownerUid !== user.firebaseUid) {
-			ctx.status = 403;
-			ctx.body = {
-				error: "Forbidden",
-			};
-			return;
-		}
-		await ctx.prisma.upload.delete({
-			where: {
-				id,
-			},
-		});
-		ctx.status = 204;
+uploadsRouter.delete("/:id", authGuard(), async ctx => {
+	const user = ctx.state.user;
+
+	const id = idPathParamSchema.parse(ctx.params["id"]);
+
+	const upload = await uploadsService.getUploadById(ctx, id);
+
+	if (!upload) {
+		ctx.status = 404;
+		ctx.body = {
+			error: "Upload not found",
+		};
+		return;
 	}
-);
+
+	if (upload.ownerUid !== user.firebaseUid) {
+		ctx.status = 403;
+		ctx.body = {
+			error: "Forbidden",
+		};
+		return;
+	}
+
+	await uploadsService.deleteUpload(ctx, id);
+
+	ctx.status = 204;
+});
 
 export default uploadsRouter;

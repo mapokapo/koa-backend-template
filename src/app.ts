@@ -71,7 +71,7 @@ export default class App {
 		registerRouters("/api", this.koaApp);
 
 		this.listener = this.koaApp.listen(this.config.PORT).on("listening", () => {
-			this.logger.info(`✅ Listening on http://localhost:${this.config!.PORT}`);
+			this.logger.info(`✅ Listening on http://localhost:${this.config.PORT}`);
 		});
 	}
 

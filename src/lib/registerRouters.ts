@@ -16,7 +16,6 @@ async function registerRouters(baseUriPath: string, app: KoaApp) {
 	const baseRouter = new Router<KoaAppState, KoaAppContext>({
 		prefix: baseUriPath,
 	});
-	console.log(routers);
 	for (const router of routers) {
 		baseRouter.use(router.routes());
 		baseRouter.use(router.allowedMethods());

@@ -1,24 +1,25 @@
 import Router from "@koa/router";
-import { z } from "zod";
 import { KoaAppContext, KoaAppState } from "../app.js";
 import authGuard from "../middleware/authGuard.js";
-import { Profile } from "@prisma/client";
+import postsService from "../services/postsService.js";
+import postPostRequestSchema from "../schemas/requests/postPostRequest.js";
+import idPathParamSchema from "../schemas/pathParams/id.js";
+import patchPostRequestSchema from "../schemas/requests/patchPostRequest.js";
 
 const postsRouter = new Router<KoaAppState, KoaAppContext>({
 	prefix: "/posts",
 });
 
 postsRouter.get("/", async ctx => {
-	const posts = await ctx.prisma.post.findMany();
+	const posts = await postsService.getAllPosts(ctx);
+
 	ctx.body = posts;
 });
 postsRouter.get("/:id", async ctx => {
-	const id = z.coerce.number().parse(ctx.params["id"]);
-	const post = await ctx.prisma.post.findUnique({
-		where: {
-			id,
-		},
-	});
+	const id = idPathParamSchema.parse(ctx.params["id"]);
+
+	const post = await postsService.getPostById(ctx, id);
+
 	if (!post) {
 		ctx.status = 404;
 		ctx.body = {
@@ -26,38 +27,28 @@ postsRouter.get("/:id", async ctx => {
 		};
 		return;
 	}
+
 	ctx.body = post;
 });
-postsRouter.post("/", authGuard({ requiresProfile: true }), async ctx => {
-	const user = ctx.state.user as Profile;
-	const body = z
-		.object({
-			title: z.string(),
-			content: z.string(),
-		})
-		.parse(ctx.request.body);
-	const post = await ctx.prisma.post.create({
-		data: {
-			title: body.title,
-			content: body.content,
-			author: {
-				connect: {
-					firebaseUid: user.firebaseUid,
-				},
-			},
-		},
-	});
+postsRouter.post("/", authGuard(), async ctx => {
+	const user = ctx.state.user;
+
+	const body = postPostRequestSchema.parse(ctx.request.body);
+
+	const post = await postsService.createPost(ctx, user, body);
+
 	ctx.status = 201;
 	ctx.body = post;
 });
-postsRouter.patch("/:id", authGuard({ requiresProfile: true }), async ctx => {
-	const user = ctx.state.user as Profile;
-	const id = z.coerce.number().parse(ctx.params["id"]);
-	const post = await ctx.prisma.post.findUnique({
-		where: {
-			id,
-		},
-	});
+postsRouter.patch("/:id", authGuard(), async ctx => {
+	const user = ctx.state.user;
+
+	const id = idPathParamSchema.parse(ctx.params["id"]);
+
+	const body = patchPostRequestSchema.parse(ctx.request.body);
+
+	const post = await postsService.getPostById(ctx, id);
+
 	if (!post) {
 		ctx.status = 404;
 		ctx.body = {
@@ -65,6 +56,7 @@ postsRouter.patch("/:id", authGuard({ requiresProfile: true }), async ctx => {
 		};
 		return;
 	}
+
 	if (post.authorUid !== user.firebaseUid) {
 		ctx.status = 403;
 		ctx.body = {
@@ -72,31 +64,17 @@ postsRouter.patch("/:id", authGuard({ requiresProfile: true }), async ctx => {
 		};
 		return;
 	}
-	const body = z
-		.object({
-			title: z.string().optional(),
-			content: z.string().optional(),
-		})
-		.parse(ctx.request.body);
-	const updatedPost = await ctx.prisma.post.update({
-		where: {
-			id,
-		},
-		data: {
-			title: body.title,
-			content: body.content,
-		},
-	});
+	const updatedPost = await postsService.updatePost(ctx, id, body);
+
 	ctx.body = updatedPost;
 });
-postsRouter.delete("/:id", authGuard({ requiresProfile: true }), async ctx => {
-	const user = ctx.state.user as Profile;
-	const id = z.coerce.number().parse(ctx.params["id"]);
-	const post = await ctx.prisma.post.findUnique({
-		where: {
-			id,
-		},
-	});
+postsRouter.delete("/:id", authGuard(), async ctx => {
+	const user = ctx.state.user;
+
+	const id = idPathParamSchema.parse(ctx.params["id"]);
+
+	const post = await postsService.getPostById(ctx, id);
+
 	if (!post) {
 		ctx.status = 404;
 		ctx.body = {
@@ -104,6 +82,7 @@ postsRouter.delete("/:id", authGuard({ requiresProfile: true }), async ctx => {
 		};
 		return;
 	}
+
 	if (post.authorUid !== user.firebaseUid) {
 		ctx.status = 403;
 		ctx.body = {
@@ -111,11 +90,9 @@ postsRouter.delete("/:id", authGuard({ requiresProfile: true }), async ctx => {
 		};
 		return;
 	}
-	await ctx.prisma.post.delete({
-		where: {
-			id,
-		},
-	});
+
+	await postsService.deletePost(ctx, id);
+
 	ctx.status = 204;
 });
 
