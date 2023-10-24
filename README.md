@@ -89,6 +89,9 @@ are some exceptions:
 ## Roadmap
 
 - [ ] Add automatically generated OpenAPI documentation
+- [ ] Add tests
+- [ ] Add a Dockerfile
+- [ ] Add CI/CD
 
 ## Contributing
 
