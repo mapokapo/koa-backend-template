@@ -13,40 +13,52 @@ datasource db {
 
 model Profile {
   firebaseUid String    @id
+
   email       String    @unique
   name        String
   imageUrl    String?
+
   roles       Role[]
   posts       Post[]
   uploads     Upload[]
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
 
 model Role {
   id        Int       @id @default(autoincrement())
+
   name      String    @unique
+
   profiles  Profile[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
 
 model Post {
   id        Int      @id @default(autoincrement())
+
   title     String
   content   String?
-  author    Profile  @relation(fields: [authorUid], references: [firebaseUid])
+
+  author    Profile  @relation(fields: [authorUid], references: [firebaseUid], onDelete: Cascade)
   authorUid String
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Upload {
   id        Int   @id @default(autoincrement())
+
   fileName  String
   mimeType  String
-  owner     Profile  @relation(fields: [ownerUid], references: [firebaseUid])
+
+  owner     Profile  @relation(fields: [ownerUid], references: [firebaseUid], onDelete: Cascade)
   ownerUid  String
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

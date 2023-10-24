@@ -1,41 +1,37 @@
-import { Profile } from "@prisma/client";
+import { Post } from "@prisma/client";
 import { KoaAppContext } from "../app.js";
 import { PostPostRequest } from "../schemas/requests/postPostRequest.js";
 import { PatchPostRequest } from "../schemas/requests/patchPostRequest.js";
+import Service from "../types/Service.js";
 
-const postsService = {
-	getAllPosts: async (ctx: KoaAppContext) => {
+export interface PostsService
+	extends Service<Post, PostPostRequest, PatchPostRequest, KoaAppContext> {}
+
+const postsService: PostsService = {
+	getAll: async ctx => {
 		return await ctx.prisma.post.findMany();
 	},
-	getPostById: async (ctx: KoaAppContext, id: number) => {
+	getById: async (ctx, id) => {
 		return await ctx.prisma.post.findUnique({
 			where: {
 				id,
 			},
 		});
 	},
-	createPost: async (
-		ctx: KoaAppContext,
-		user: Profile,
-		data: PostPostRequest
-	) => {
+	create: async (ctx, firebaseUid, data) => {
 		return await ctx.prisma.post.create({
 			data: {
 				title: data.title,
 				content: data.content,
 				author: {
 					connect: {
-						firebaseUid: user.firebaseUid,
+						firebaseUid,
 					},
 				},
 			},
 		});
 	},
-	updatePost: async (
-		ctx: KoaAppContext,
-		id: number,
-		data: PatchPostRequest
-	) => {
+	update: async (ctx, id, data) => {
 		return await ctx.prisma.post.update({
 			where: {
 				id,
@@ -46,7 +42,7 @@ const postsService = {
 			},
 		});
 	},
-	deletePost: async (ctx: KoaAppContext, id: number) => {
+	delete: async (ctx, id) => {
 		return await ctx.prisma.post.delete({
 			where: {
 				id,

@@ -10,23 +10,9 @@ const profilesRouter = new Router<KoaAppState, KoaAppContext>({
 });
 
 profilesRouter.get("/:id", authGuard(), async ctx => {
-	const id = firebaseUidPathParamSchema.parse(ctx.params["id"]);
+	const firebaseUid = firebaseUidPathParamSchema.parse(ctx.params["id"]);
 
-	const profile = await profilesService.getProfileByFirebaseUid(ctx, id);
-
-	if (!profile) {
-		ctx.status = 404;
-		return;
-	}
-
-	ctx.body = profile;
-});
-profilesRouter.patch("/:id", authGuard(), async ctx => {
-	const user = ctx.state.user;
-
-	const id = firebaseUidPathParamSchema.parse(ctx.params["id"]);
-
-	const profile = await profilesService.getProfileByFirebaseUid(ctx, id);
+	const profile = await profilesService.getById(ctx, firebaseUid);
 
 	if (!profile) {
 		ctx.status = 404;
@@ -36,7 +22,22 @@ profilesRouter.patch("/:id", authGuard(), async ctx => {
 		return;
 	}
 
-	if (profile.firebaseUid !== user.firebaseUid) {
+	ctx.body = profile;
+});
+profilesRouter.patch("/:id", authGuard(), async ctx => {
+	const firebaseUid = firebaseUidPathParamSchema.parse(ctx.params["id"]);
+
+	const profile = await profilesService.getById(ctx, firebaseUid);
+
+	if (!profile) {
+		ctx.status = 404;
+		ctx.body = {
+			error: "Profile not found",
+		};
+		return;
+	}
+
+	if (profile.firebaseUid !== ctx.state.user.firebaseUid) {
 		ctx.status = 403;
 		ctx.body = {
 			error: "Forbidden",
@@ -46,7 +47,7 @@ profilesRouter.patch("/:id", authGuard(), async ctx => {
 
 	const body = patchProfileRequestSchema.parse(ctx.request.body);
 
-	const updatedProfile = await profilesService.updateProfile(ctx, id, body);
+	const updatedProfile = await profilesService.update(ctx, firebaseUid, body);
 
 	ctx.body = updatedProfile;
 });

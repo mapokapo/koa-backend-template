@@ -12,18 +12,17 @@ const uploadsRouter = new Router<KoaAppState, KoaAppContext>({
 });
 
 uploadsRouter.get("/", authGuard(), async ctx => {
-	const user = ctx.state.user;
-
-	const uploads = await uploadsService.getAllUploads(ctx, user.firebaseUid);
+	const uploads = await uploadsService.getAllForUser(
+		ctx,
+		ctx.state.user.firebaseUid
+	);
 
 	ctx.body = uploads;
 });
 uploadsRouter.get("/:id", authGuard(), async ctx => {
-	const user = ctx.state.user;
-
 	const id = idPathParamSchema.parse(ctx.params["id"]);
 
-	const upload = await uploadsService.getUploadById(ctx, id);
+	const upload = await uploadsService.getById(ctx, id);
 
 	if (!upload) {
 		ctx.body = {
@@ -33,7 +32,7 @@ uploadsRouter.get("/:id", authGuard(), async ctx => {
 		return;
 	}
 
-	if (upload.ownerUid !== user.firebaseUid) {
+	if (upload.ownerUid !== ctx.state.user.firebaseUid) {
 		ctx.body = {
 			error: "Forbidden",
 		};
@@ -44,11 +43,9 @@ uploadsRouter.get("/:id", authGuard(), async ctx => {
 	ctx.body = upload;
 });
 uploadsRouter.get("/:id/download", authGuard(), async ctx => {
-	const user = ctx.state.user;
-
 	const id = idPathParamSchema.parse(ctx.params["id"]);
 
-	const upload = await uploadsService.getUploadById(ctx, id);
+	const upload = await uploadsService.getById(ctx, id);
 
 	if (!upload) {
 		ctx.body = {
@@ -58,7 +55,7 @@ uploadsRouter.get("/:id/download", authGuard(), async ctx => {
 		return;
 	}
 
-	if (upload.ownerUid !== user.firebaseUid) {
+	if (upload.ownerUid !== ctx.state.user.firebaseUid) {
 		ctx.body = {
 			error: "Forbidden",
 		};
@@ -73,12 +70,11 @@ uploadsRouter.post(
 	fileUploadMiddleware().single("file"),
 	authGuard(),
 	async ctx => {
-		const user = ctx.state.user;
 		const file = ctx.request.file;
 
-		const upload = await uploadsService.createUpload(
+		const upload = await uploadsService.create(
 			ctx,
-			user.firebaseUid,
+			ctx.state.user.firebaseUid,
 			file
 		);
 
@@ -90,12 +86,11 @@ uploadsRouter.put(
 	fileUploadMiddleware().single("file"),
 	authGuard(),
 	async ctx => {
-		const user = ctx.state.user;
 		const file = ctx.request.file;
 
 		const id = idPathParamSchema.parse(ctx.params["id"]);
 
-		const upload = await uploadsService.getUploadById(ctx, id);
+		const upload = await uploadsService.getById(ctx, id);
 
 		if (!upload) {
 			ctx.status = 404;
@@ -105,7 +100,7 @@ uploadsRouter.put(
 			return;
 		}
 
-		if (upload.ownerUid !== user.firebaseUid) {
+		if (upload.ownerUid !== ctx.state.user.firebaseUid) {
 			ctx.status = 403;
 			ctx.body = {
 				error: "Forbidden",
@@ -113,17 +108,15 @@ uploadsRouter.put(
 			return;
 		}
 
-		const newUpload = await uploadsService.updateUpload(ctx, id, file);
+		const newUpload = await uploadsService.update(ctx, id, file);
 
 		ctx.body = newUpload;
 	}
 );
 uploadsRouter.delete("/:id", authGuard(), async ctx => {
-	const user = ctx.state.user;
-
 	const id = idPathParamSchema.parse(ctx.params["id"]);
 
-	const upload = await uploadsService.getUploadById(ctx, id);
+	const upload = await uploadsService.getById(ctx, id);
 
 	if (!upload) {
 		ctx.status = 404;
@@ -133,7 +126,7 @@ uploadsRouter.delete("/:id", authGuard(), async ctx => {
 		return;
 	}
 
-	if (upload.ownerUid !== user.firebaseUid) {
+	if (upload.ownerUid !== ctx.state.user.firebaseUid) {
 		ctx.status = 403;
 		ctx.body = {
 			error: "Forbidden",
@@ -141,7 +134,7 @@ uploadsRouter.delete("/:id", authGuard(), async ctx => {
 		return;
 	}
 
-	await uploadsService.deleteUpload(ctx, id);
+	await uploadsService.delete(ctx, id);
 
 	ctx.status = 204;
 });

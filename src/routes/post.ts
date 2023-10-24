@@ -11,14 +11,14 @@ const postsRouter = new Router<KoaAppState, KoaAppContext>({
 });
 
 postsRouter.get("/", async ctx => {
-	const posts = await postsService.getAllPosts(ctx);
+	const posts = await postsService.getAll(ctx);
 
 	ctx.body = posts;
 });
 postsRouter.get("/:id", async ctx => {
 	const id = idPathParamSchema.parse(ctx.params["id"]);
 
-	const post = await postsService.getPostById(ctx, id);
+	const post = await postsService.getById(ctx, id);
 
 	if (!post) {
 		ctx.status = 404;
@@ -31,23 +31,19 @@ postsRouter.get("/:id", async ctx => {
 	ctx.body = post;
 });
 postsRouter.post("/", authGuard(), async ctx => {
-	const user = ctx.state.user;
-
 	const body = postPostRequestSchema.parse(ctx.request.body);
 
-	const post = await postsService.createPost(ctx, user, body);
+	const post = await postsService.create(ctx, ctx.state.user.firebaseUid, body);
 
 	ctx.status = 201;
 	ctx.body = post;
 });
 postsRouter.patch("/:id", authGuard(), async ctx => {
-	const user = ctx.state.user;
-
 	const id = idPathParamSchema.parse(ctx.params["id"]);
 
 	const body = patchPostRequestSchema.parse(ctx.request.body);
 
-	const post = await postsService.getPostById(ctx, id);
+	const post = await postsService.getById(ctx, id);
 
 	if (!post) {
 		ctx.status = 404;
@@ -57,23 +53,21 @@ postsRouter.patch("/:id", authGuard(), async ctx => {
 		return;
 	}
 
-	if (post.authorUid !== user.firebaseUid) {
+	if (post.authorUid !== ctx.state.user.firebaseUid) {
 		ctx.status = 403;
 		ctx.body = {
 			error: "Forbidden",
 		};
 		return;
 	}
-	const updatedPost = await postsService.updatePost(ctx, id, body);
+	const updatedPost = await postsService.update(ctx, id, body);
 
 	ctx.body = updatedPost;
 });
 postsRouter.delete("/:id", authGuard(), async ctx => {
-	const user = ctx.state.user;
-
 	const id = idPathParamSchema.parse(ctx.params["id"]);
 
-	const post = await postsService.getPostById(ctx, id);
+	const post = await postsService.getById(ctx, id);
 
 	if (!post) {
 		ctx.status = 404;
@@ -83,7 +77,7 @@ postsRouter.delete("/:id", authGuard(), async ctx => {
 		return;
 	}
 
-	if (post.authorUid !== user.firebaseUid) {
+	if (post.authorUid !== ctx.state.user.firebaseUid) {
 		ctx.status = 403;
 		ctx.body = {
 			error: "Forbidden",
@@ -91,7 +85,7 @@ postsRouter.delete("/:id", authGuard(), async ctx => {
 		return;
 	}
 
-	await postsService.deletePost(ctx, id);
+	await postsService.delete(ctx, id);
 
 	ctx.status = 204;
 });

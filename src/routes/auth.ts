@@ -1,7 +1,7 @@
 import Router from "@koa/router";
 import { KoaAppContext, KoaAppState } from "../app.js";
 import authGuard from "../middleware/authGuard.js";
-import createProfileRequest from "../schemas/requests/createProfileRequest.js";
+import createProfileRequest from "../schemas/requests/postProfileRequest.js";
 import profilesService from "../services/profilesService.js";
 
 const authRouter = new Router<KoaAppState, KoaAppContext>({
@@ -15,9 +15,10 @@ authRouter.post(
 	async ctx => {
 		const body = createProfileRequest.parse(ctx.request.body);
 
-		const existingProfile = await profilesService.getProfileByFirebaseUid(
+		const existingProfile = await profilesService.getByIdOrEmail(
 			ctx,
-			body.firebaseUid
+			ctx.state.uid,
+			body.email
 		);
 
 		if (existingProfile !== null) {
@@ -28,7 +29,7 @@ authRouter.post(
 			return;
 		}
 
-		const profile = await profilesService.createProfile(ctx, body);
+		const profile = await profilesService.create(ctx, ctx.state.uid, body);
 
 		ctx.body = profile;
 	}

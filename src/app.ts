@@ -15,6 +15,8 @@ export interface KoaAppContext extends Koa.Context {
 }
 export interface KoaAppState extends Koa.DefaultState {
 	user?: Profile;
+	accessToken?: string;
+	uid?: string;
 }
 
 export type KoaApp = Koa<KoaAppState, KoaAppContext>;

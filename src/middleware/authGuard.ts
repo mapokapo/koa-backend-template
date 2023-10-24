@@ -23,9 +23,9 @@ export type AuthGuardFunction = <
 	requiresRoles?: RR;
 }) => Middleware<
 	KoaAppState & {
-		user: RP extends true ? Profile : undefined;
-	} & {
-		user: RR extends string[] ? Profile : undefined;
+		accessToken: string;
+		uid: string;
+		user: RP extends true ? Profile : RR extends string[] ? Profile : never;
 	},
 	KoaAppContext
 >;
@@ -38,8 +38,8 @@ const authGuard: AuthGuardFunction = requirements => {
 		ctx,
 		next
 	) => {
-		const idToken = ctx.cookies.get("idToken");
-		if (!idToken) {
+		const accessToken = ctx.headers.authorization?.split(" ")[1];
+		if (!accessToken) {
 			ctx.status = 401;
 			ctx.body = {
 				error: "Unauthorized",
@@ -51,7 +51,7 @@ const authGuard: AuthGuardFunction = requirements => {
 		try {
 			const decodedToken = await ctx.firebaseAdmin
 				.auth()
-				.verifyIdToken(idToken);
+				.verifyIdToken(accessToken);
 
 			if (requiresProfile) {
 				const profile = await ctx.prisma.profile.findUnique({
@@ -86,6 +86,9 @@ const authGuard: AuthGuardFunction = requirements => {
 				}
 				ctx.state.user = profile;
 			}
+
+			ctx.state.accessToken = accessToken;
+			ctx.state.uid = decodedToken.uid;
 
 			return next();
 		} catch (e) {
